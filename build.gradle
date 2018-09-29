@@ -1,0 +1,157 @@
+/*
+ * Copyright 2016 - 2018 Florian Spieß
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'com.jfrog.bintray' version '1.7.3'
+    id 'org.jetbrains.kotlin.jvm' version '1.2.0'
+    id 'com.github.johnrengelman.shadow' version '2.0.1'
+}
+
+group 'club.minnced'
+version '2.0.1'
+
+publishing {
+    publications {
+        BintrayRelease(MavenPublication) {
+            from components.java
+            groupId group
+            artifactId archivesBaseName
+            version version
+
+            artifact javadocJar
+            artifact sourcesJar
+        }
+    }
+}
+
+sourceSets {
+    examples {
+        compileClasspath = main.output
+        runtimeClasspath = main.output
+        java.srcDirs = ['examples/java']
+        kotlin.srcDirs = ['examples/kotlin']
+    }
+}
+
+sourceCompatibility = targetCompatibility = JavaVersion.VERSION_1_8
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    api 'net.java.dev.jna:jna:4.4.0'
+    implementation 'club.minnced:discord-rpc-release:v3.3.0'
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+    examplesCompile 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.2.0'
+    examplesCompile compileJava.classpath
+}
+
+wrapper {
+    gradleVersion = '4.6'
+}
+
+tasks.withType(JavaCompile) {
+    options.incremental = true
+    options.encoding = 'UTF-8'
+}
+
+// Publishing
+
+task sources(type: Copy) {
+    from 'src/main/java'
+    into "$buildDir/sources"
+}
+
+classes.dependsOn sources
+
+jar {
+    baseName = project.name
+    manifest {
+        attributes 'Implementation-Version': version
+        attributes 'Target-Platforms': 'win32-x86-64, win32-x86, linux-x86-64, darwin'
+    }
+
+    dependsOn sources
+}
+
+javadoc {
+    failOnError = false
+    options.author()
+    options.encoding = 'UTF-8'
+    options.addStringOption('-html5') // jdk-9 docs
+
+    dependsOn sources
+    source = sources.destinationDir
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from "$buildDir/sources"
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+bintray {
+    user = getProjectProperty('bintrayUsername')
+    key = getProjectProperty('bintrayApiKey')
+    publications = ["BintrayRelease"]
+    pkg {
+        repo = 'maven'
+        name = project.name
+        licenses = ['Apache-2.0']
+        vcsUrl = 'https://github.com/MinnDevelopment/java-discord-rpc.git'
+        githubRepo = 'MinnDevelopment/java-discord-rpc'
+        publish = true
+        version {
+            name = project.version
+            vcsTag = project.version
+            released = new Date()
+            gpg {
+                sign = true
+            }
+        }
+    }
+}
+
+bintrayUpload {
+    dependsOn clean
+    dependsOn build
+    build.mustRunAfter clean
+
+    onlyIf { !getProjectProperty('bintrayUsername').empty }
+    onlyIf { !getProjectProperty('bintrayApiKey').empty }
+}
+
+def getProjectProperty(String key) {
+    return hasProperty(key) ? this.properties[key] : ''
+}
+
+build {
+    dependsOn jar
+    dependsOn javadocJar
+    dependsOn sourcesJar
+    dependsOn shadowJar
+
+    jar.mustRunAfter clean
+    javadocJar.mustRunAfter jar
+    sourcesJar.mustRunAfter javadocJar
+    shadowJar.mustRunAfter sourcesJar
+}
