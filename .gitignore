@@ -4,7 +4,6 @@ build/*
 .idea/*
 .classpath
 .settings/*
-bin/*
 .project
 .gradle/*
 .idea/
