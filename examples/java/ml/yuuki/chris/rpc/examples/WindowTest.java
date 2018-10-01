@@ -5,12 +5,92 @@ import club.minnced.discord.rpc.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 public class WindowTest {
 
+	private static final Path SETTINGS = FileSystems.getDefault().getPath("settings.json");
+	private static String APP_ID="unset";
+
+	public static void saveSettings(DiscordRichPresence presence){
+		String jsonString = "{ \"appID\": \""+APP_ID+"\"," +
+				"\"state\": \""+presence.state+"\","+
+				"\"details\": \""+presence.details+"\","+
+				"\"startTimestamp\": \""+presence.startTimestamp+"\","+
+				"\"endTimestamp\": \""+presence.endTimestamp+"\","+
+				"\"largeImageKey\": \""+presence.largeImageKey+"\","+
+				"\"largeImageText\": \""+presence.largeImageText+"\","+
+				"\"smallImageKey\": \""+presence.smallImageKey+"\","+
+				"\"smallImageText\": \""+presence.smallImageText+"\","+
+				"\"partyId\": \""+presence.partyId+"\","+
+				"\"partySize\": \""+presence.partySize+"\","+
+				"\"partyMax\": \""+presence.partyMax+"\","+
+				"\"matchSecret\": \""+presence.matchSecret+"\","+
+				"\"joinSecret\": \""+presence.joinSecret+"\","+
+				"\"spectateSecret\": \""+presence.spectateSecret+"\","+
+				"\"instance\": \""+presence.instance+"\""+
+				" }";
+		ArrayList<String> fileText = new ArrayList<>();
+		fileText.add(jsonString);
+
+		try {
+			Files.write(SETTINGS, fileText, StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static DiscordRichPresence loadSettings(){
+		DiscordRichPresence presence = new DiscordRichPresence();
+		try {
+			List<String> content = Files.readAllLines(SETTINGS);
+			String[] parsed = content.get(0).split("\"");
+			ArrayList<String> values = new ArrayList();
+			for(int i=0; true; i++){
+				if(i%4==3){
+					System.out.println(parsed[i]);
+					if(parsed[i]=="null"){
+						values.add("");
+					}else {
+						values.add(parsed[i]);
+					}
+				}
+				if(i>=parsed.length){
+					break;
+				}
+			}
+			APP_ID=values.get(0);
+			presence.state=values.get(1);
+			presence.details=values.get(2);
+			presence.startTimestamp=Long.parseLong(values.get(3));
+			presence.endTimestamp=Long.parseLong(values.get(4));
+			presence.largeImageKey=values.get(5);
+			presence.largeImageText=values.get(6);
+			presence.smallImageKey=values.get(7);
+			presence.smallImageText=values.get(8);
+			presence.partyId=values.get(9);
+			presence.partySize=Integer.parseInt(values.get(10));
+			presence.partyMax=Integer.parseInt(values.get(11));
+			//presence.matchSecret=values.get(12);
+			//presence.joinSecret=values.get(13);
+			//presence.spectateSecret=values.get(14);
+			presence.instance=Byte.parseByte(values.get(15));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		return presence;
+	}
+
 	public static void main(String args[]) {
 		DiscordRPC lib = DiscordRPC.INSTANCE;
-		DiscordRichPresence presence = new DiscordRichPresence();
+		DiscordRichPresence presence = loadSettings();//new DiscordRichPresence();
 		DiscordEventHandlers handlers = new DiscordEventHandlers();
 		handlers.ready = (user) -> System.out.println("Ready!");
 
@@ -18,8 +98,7 @@ public class WindowTest {
 
 		presence.startTimestamp = System.currentTimeMillis() / 1000; // epoch second
 		//presence.endTimestamp   = presence.startTimestamp + 20;
-		presence.details   = "Detail here";
-		presence.state     = "State here";
+
 		presence.partySize = 0;
 		presence.partyMax  = 0;
 		//lib.Discord_UpdatePresence(presence);
@@ -51,12 +130,12 @@ public class WindowTest {
 					JOptionPane.PLAIN_MESSAGE,
 					null,
 					possibilities,
-					"ham");
+					APP_ID);
 
 //If a string was returned, say so.
 			if ((s != null) && (s.length() > 0)) {
-				lib.Discord_Initialize(s, handlers, true, "");
-
+				APP_ID = s;
+				lib.Discord_Initialize(APP_ID, handlers, true, "");
 			}
 			//System.err.println("You must specify an application ID in the arguments!");
 			//System.exit(-1);
@@ -79,6 +158,7 @@ public class WindowTest {
 		
 		// Details
 
+
 		JLabel detailsLabel = new JLabel("Details");
 		detailsLabel.setHorizontalAlignment(SwingConstants.RIGHT);
 		JTextField detailsText = new JTextField(presence.details);
@@ -93,15 +173,15 @@ public class WindowTest {
 
 		JLabel smallImageTextLabel = new JLabel("Small image text");
 		smallImageTextLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-		JTextField smallImageTextText = new JTextField();
+		JTextField smallImageTextText = new JTextField(presence.smallImageText);
 
 		JLabel largeImageKeyLabel = new JLabel("Large image key");
 		largeImageKeyLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-		JTextField largeImageKeyText = new JTextField();
+		JTextField largeImageKeyText = new JTextField(presence.largeImageKey);
 
 		JLabel largeImageTextLabel = new JLabel("Large image text");
 		largeImageTextLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-		JTextField largeImageTextText = new JTextField();
+		JTextField largeImageTextText = new JTextField(presence.largeImageText);
 
 		JLabel partyLabel = new JLabel("Party size");
 		partyLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -140,6 +220,8 @@ public class WindowTest {
 			} // if text isn't a number, ignore it
 			
 			lib.Discord_UpdatePresence(presence);
+			System.out.println("App id: "+APP_ID);
+			saveSettings(presence);
 		});
 		
 		top.add(detailsLabel);
